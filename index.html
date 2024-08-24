@@ -1,0 +1,107 @@
+<html><head><base href="https://icon-creator.example.com/">
+<title>Random Icon Generator</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f0f0f0;
+    }
+    #downloadBtn {
+        padding: 10px 20px;
+        font-size: 18px;
+        cursor: pointer;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+    }
+    #downloadBtn:hover {
+        background-color: #45a049;
+    }
+</style>
+</head>
+<body>
+<button id="downloadBtn">Download Random Icon</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jscolor/2.4.5/jscolor.min.js"></script>
+<script>
+function generateContrastingColors() {
+    const hues = [Math.random() * 360, (Math.random() * 360 + 120) % 360, (Math.random() * 360 + 240) % 360];
+    return hues.map(h => `hsl(${h}, 100%, 50%)`);
+}
+
+function createIconCanvas(colors) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Draw concentric circles
+    for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = colors[i];
+        ctx.beginPath();
+        ctx.arc(128, 128, 128 - i * 40, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    return canvas;
+}
+
+function canvasToICO(canvas) {
+    return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                const arrayBuffer = this.result;
+                const dataView = new DataView(arrayBuffer);
+
+                // ICO header
+                const header = new ArrayBuffer(6);
+                const headerView = new DataView(header);
+                headerView.setUint16(0, 0, true); // Reserved
+                headerView.setUint16(2, 1, true); // ICO type
+                headerView.setUint16(4, 1, true); // Number of images
+
+                // ICONDIRENTRY
+                const entry = new ArrayBuffer(16);
+                const entryView = new DataView(entry);
+                entryView.setUint8(0, canvas.width);
+                entryView.setUint8(1, canvas.height);
+                entryView.setUint8(2, 0); // Color palette
+                entryView.setUint8(3, 0); // Reserved
+                entryView.setUint16(4, 1, true); // Color planes
+                entryView.setUint16(6, 32, true); // Bits per pixel
+                entryView.setUint32(8, dataView.byteLength, true); // Image size
+                entryView.setUint32(12, header.byteLength + entry.byteLength, true); // Image offset
+
+                const iconData = new Uint8Array(header.byteLength + entry.byteLength + arrayBuffer.byteLength);
+                iconData.set(new Uint8Array(header), 0);
+                iconData.set(new Uint8Array(entry), header.byteLength);
+                iconData.set(new Uint8Array(arrayBuffer), header.byteLength + entry.byteLength);
+
+                resolve(new Blob([iconData], {type: 'image/x-icon'}));
+            };
+            reader.readAsArrayBuffer(blob);
+        }, 'image/png');
+    });
+}
+
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+    const colors = generateContrastingColors();
+    const canvas = createIconCanvas(colors);
+    const iconBlob = await canvasToICO(canvas);
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = URL.createObjectURL(iconBlob);
+    downloadLink.download = 'random_icon.ico';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+});
+</script>
+</body></html>
